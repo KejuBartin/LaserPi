@@ -102,3 +102,8 @@ def create_circle_shape():
 def create_multilines_shape():
     # placeholder: actual rendering for multiple parallel lines is handled by the 'lines' effect
     return []
+
+
+@register_shape("dots", closed=False)
+def create_dots_shape():
+    return []

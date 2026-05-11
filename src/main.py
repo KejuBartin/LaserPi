@@ -4,7 +4,7 @@ from collections import OrderedDict
 
 from colors import get_color_function
 from effects import apply_effect_chain
-from renderer import create_gradient_outline_surface, create_parallel_lines_surface
+from renderer import create_gradient_outline_surface, create_parallel_lines_surface, create_dots_surface
 from shapes import get_shape_preset
 from state import SharedLaserState
 from web_control import start_web_server
@@ -29,6 +29,7 @@ pygame.display.set_caption("Showlaser")
 clock = pygame.time.Clock()
 
 control_state = SharedLaserState()
+control_state.update(viewport_width=WIDTH, viewport_height=HEIGHT)
 
 try:
     web_server = start_web_server(control_state)
@@ -85,6 +86,19 @@ def build_shape_surface(snapshot):
             offset=snapshot.lines_offset,
             segments_per_line=snapshot.segments_per_edge,
             gradient_zoom=snapshot.lines_gradient_zoom,
+        )
+
+    if snapshot.shape_name == "dots":
+        # Keep a single dot compact so bounce can move it across the screen.
+        dot_canvas = (WIDTH, HEIGHT)
+        if int(snapshot.dot_count) <= 1:
+            single_size = max(16, int(snapshot.line_width) * 6)
+            dot_canvas = (single_size, single_size)
+        return create_dots_surface(
+            dot_canvas,
+            dot_count=snapshot.dot_count,
+            line_width=snapshot.line_width,
+            color_fn=color_fn,
         )
 
     shape_points = preset.factory()
@@ -147,6 +161,7 @@ try:
                 snapshot.line_width,
                 snapshot.segments_per_edge,
                 snapshot.line_angle,
+                snapshot.dot_count if snapshot.shape_name == "dots" else 0,
             )
 
             if cache_key in surface_cache:

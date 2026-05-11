@@ -25,10 +25,16 @@ def start_ableton_link(control_state, interval=0.016):
                     await asyncio.sleep(interval)
                     continue
 
-                # update shared state with link tempo and phase
+                # Update timing from Link unless override mode is active.
                 try:
-                    control_state.update(bpm=getattr(link, 'tempo', control_state.snapshot().bpm),
-                                         beat_phase=getattr(link, 'phase', control_state.snapshot().beat_phase))
+                    snapshot = control_state.snapshot()
+                    if bool(getattr(snapshot, "motion_override_bpm", False)):
+                        # In override mode, keep local BPM/phase from the slider-driven clock.
+                        continue
+                    control_state.update(
+                        bpm=getattr(link, "tempo", snapshot.bpm),
+                        beat_phase=getattr(link, "phase", snapshot.beat_phase),
+                    )
                 except Exception:
                     pass
 

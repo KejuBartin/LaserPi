@@ -83,6 +83,9 @@ HTML = """<!doctype html>
       padding: 10px 14px;
       font: inherit;
     }
+    button, select, input[type="range"], input[type="color"], input[type="number"] {
+      cursor: pointer;
+    }
     button.active {
       background: linear-gradient(135deg, var(--accent), var(--accent-2));
       color: #061018;
@@ -165,6 +168,11 @@ HTML = """<!doctype html>
           <input id="lines_gradient_zoom" type="range" min="0.1" max="4" step="0.05">
           <input id="lines_gradient_zoom_value" type="number" min="0.1" max="4" step="0.05">
         </div>
+        <div class="field hidden" id="dots_controls">
+          <label for="dot_count">Dot Count</label>
+          <input id="dot_count" type="range" min="1" max="50" step="1">
+          <input id="dot_count_value" type="number" min="1" max="50" step="1">
+        </div>
       </section>
       <section class="card">
         <h2>Effect</h2>
@@ -176,8 +184,14 @@ HTML = """<!doctype html>
         <div class="field">
           <label for="motion_effect">Motion</label>
           <select id="motion_effect"></select>
-          <label for="motion_speed">Motion Speed</label>
-          <input id="motion_speed" type="range" min="0" max="2" step="0.01">
+          <label for="bounce_direction" id="bounce_direction_label" class="hidden">Bounce Direction</label>
+          <select id="bounce_direction" class="hidden">
+            <option value="horizontal">Horizontal</option>
+            <option value="vertical">Vertical</option>
+          </select>
+          <label for="bounce_range" id="bounce_range_label" class="hidden">Bounce Space</label>
+          <input id="bounce_range" class="hidden" type="range" min="0" max="1" step="0.01">
+          <input id="bounce_range_value" class="hidden" type="number" min="0" max="1" step="0.01">
         </div>
       </section>
       <section class="card">
@@ -194,6 +208,13 @@ HTML = """<!doctype html>
           <label for="bpm">BPM</label>
           <input id="bpm" type="range" min="40" max="220" step="1">
           <span class="value" id="bpm_value"></span>
+        </div>
+        <div class="field">
+          <label for="motion_override_bpm">Motion Timing</label>
+          <select id="motion_override_bpm">
+            <option value="music">Follow Music Beat</option>
+            <option value="bpm">Override Beat (Use BPM Slider)</option>
+          </select>
         </div>
         <div class="field">
           <label for="rotation_speed">Rotation speed</label>
@@ -252,9 +273,17 @@ HTML = """<!doctype html>
     const lineWidth = document.getElementById('line_width');
     const lineWidthValue = document.getElementById('line_width_value');
     const motionEffect = document.getElementById('motion_effect');
-    const motionSpeed = document.getElementById('motion_speed');
     const linesGradientZoom = document.getElementById('lines_gradient_zoom');
     const linesGradientZoomValue = document.getElementById('lines_gradient_zoom_value');
+    const dotsControls = document.getElementById('dots_controls');
+    const dotCount = document.getElementById('dot_count');
+    const dotCountValue = document.getElementById('dot_count_value');
+    const bounceDirection = document.getElementById('bounce_direction');
+    const bounceDirectionLabel = document.getElementById('bounce_direction_label');
+    const bounceRange = document.getElementById('bounce_range');
+    const bounceRangeValue = document.getElementById('bounce_range_value');
+    const bounceRangeLabel = document.getElementById('bounce_range_label');
+    const motionOverrideBpm = document.getElementById('motion_override_bpm');
     const effectSummary = document.getElementById('effect_summary');
 
     const options = {
@@ -346,11 +375,23 @@ HTML = """<!doctype html>
       lineAngleValue.value = Math.round(state.line_angle ?? 0);
       lineWidth.value = state.line_width;
       lineWidthValue.value = state.line_width;
-      motionSpeed.value = state.motion_speed ?? state.lines_speed ?? 0.25;
+      motionOverrideBpm.value = (state.motion_override_bpm ?? false) ? 'bpm' : 'music';
       linesGradientZoom.value = state.lines_gradient_zoom ?? 0.5;
       linesGradientZoomValue.value = (state.lines_gradient_zoom ?? 0.5).toFixed(2);
       lineControls.classList.toggle('hidden', state.shape_name !== 'line');
       multilinesControls.classList.toggle('hidden', state.shape_name !== 'multilines');
+      dotsControls.classList.toggle('hidden', state.shape_name !== 'dots');
+      dotCount.value = state.dot_count ?? 5;
+      dotCountValue.value = state.dot_count ?? 5;
+      const bounceActive = !!(state.effect_names?.includes('bounce') || state.effect_name === 'bounce');
+      bounceDirection.value = state.bounce_direction ?? 'horizontal';
+      bounceDirection.classList.toggle('hidden', !bounceActive);
+      bounceDirectionLabel.classList.toggle('hidden', !bounceActive);
+      bounceRange.value = state.bounce_range ?? 1.0;
+      bounceRangeValue.value = Number(state.bounce_range ?? 1.0).toFixed(2);
+      bounceRange.classList.toggle('hidden', !bounceActive);
+      bounceRangeValue.classList.toggle('hidden', !bounceActive);
+      bounceRangeLabel.classList.toggle('hidden', !bounceActive);
       effectSummary.textContent = [
         ...(state.effect_names && state.effect_names.length ? state.effect_names : [state.effect_name]),
         ...(state.motion_name && state.motion_name !== 'none' ? [state.motion_name] : []),
@@ -402,12 +443,25 @@ HTML = """<!doctype html>
     lineWidthValue.addEventListener('change', () => apply({line_width: Number(lineWidthValue.value)}));
 
     motionEffect.addEventListener('change', () => apply({motion_name: motionEffect.value}));
-    motionSpeed.addEventListener('change', () => apply({motion_speed: Number(motionSpeed.value)}));
+    motionOverrideBpm.addEventListener('change', () => apply({motion_override_bpm: motionOverrideBpm.value === 'bpm'}));
     linesGradientZoom.addEventListener('input', () => {
       linesGradientZoomValue.value = Number(linesGradientZoom.value).toFixed(2);
     });
     linesGradientZoom.addEventListener('change', () => apply({lines_gradient_zoom: Number(linesGradientZoom.value)}));
     linesGradientZoomValue.addEventListener('change', () => apply({lines_gradient_zoom: Number(linesGradientZoomValue.value)}));
+
+    dotCount.addEventListener('input', () => {
+      dotCountValue.value = Number(dotCount.value);
+    });
+    dotCount.addEventListener('change', () => apply({dot_count: Number(dotCount.value)}));
+    dotCountValue.addEventListener('change', () => apply({dot_count: Number(dotCountValue.value)}));
+
+    bounceDirection.addEventListener('change', () => apply({bounce_direction: bounceDirection.value}));
+    bounceRange.addEventListener('input', () => {
+      bounceRangeValue.value = Number(bounceRange.value).toFixed(2);
+    });
+    bounceRange.addEventListener('change', () => apply({bounce_range: Number(bounceRange.value)}));
+    bounceRangeValue.addEventListener('change', () => apply({bounce_range: Number(bounceRangeValue.value)}));
 
     refresh();
   </script>
@@ -484,6 +538,11 @@ def _build_handler(control_state):
 
             if "motion_speed" in payload:
                 updates["motion_speed"] = max(0.0, float(payload["motion_speed"]))
+            if "motion_override_bpm" in payload:
+              updates["motion_override_bpm"] = bool(payload["motion_override_bpm"])
+            if "motion_sync_to_bpm" in payload:
+              # Backward compatibility: old flag meant BPM-linked motion.
+              updates["motion_override_bpm"] = bool(payload["motion_sync_to_bpm"])
 
             if "output_enabled" in payload:
                 updates["output_enabled"] = bool(payload["output_enabled"])
@@ -513,6 +572,13 @@ def _build_handler(control_state):
                 updates["motion_name"] = motion_name if motion_name != "rotate" else "none"
             if "lines_gradient_zoom" in payload:
                 updates["lines_gradient_zoom"] = max(0.01, float(payload["lines_gradient_zoom"]))
+
+            if "dot_count" in payload:
+                updates["dot_count"] = max(1, min(50, int(payload["dot_count"])))
+            if "bounce_direction" in payload:
+                updates["bounce_direction"] = str(payload["bounce_direction"])
+            if "bounce_range" in payload:
+              updates["bounce_range"] = max(0.0, min(1.0, float(payload["bounce_range"])))
 
             if "line_width" in payload:
                 updates["line_width"] = max(1, int(payload["line_width"]))

@@ -8,6 +8,10 @@ class LaserState:
     effect_names: list[str] = field(default_factory=lambda: ["static"])
     motion_name: str = "none"
     motion_speed: float = 0.25
+    motion_sync_to_bpm: bool = True
+    motion_override_bpm: bool = False
+    bounce_direction: str = "horizontal"
+    bounce_range: float = 1.0
     shape_name: str = "square"
     color_name: str = "rainbow"
     bpm: float = 120.0
@@ -33,6 +37,11 @@ class LaserState:
     line_angle: float = 0.0
     lines_offset: float = 0.0
     lines_gradient_zoom: float = 0.5
+    viewport_width: int = 0
+    viewport_height: int = 0
+    
+    # dots shape parameters
+    dot_count: int = 5
 
 
 class SharedLaserState:
@@ -81,12 +90,20 @@ class SharedLaserState:
                 self._state.beat_phase = (self._state.beat_phase + dt * bpm / 60.0) % 1.0
 
             motion_name = getattr(self._state, "motion_name", "none")
-            speed = float(getattr(self._state, "motion_speed", 0.0))
-            if motion_name != "none" and speed != 0:
-                step = speed * dt
-                if motion_name in ("right-to-left", "bottom-to-top"):
-                    step = -step
-
-                self._state.lines_offset = (self._state.lines_offset + step) % 1.0
+            override_bpm = bool(getattr(self._state, "motion_override_bpm", False))
+            effects = getattr(self._state, "effect_names", None) or [getattr(self._state, "effect_name", "static")]
+            bounce_active = "bounce" in effects
+            if motion_name != "none" or bounce_active:
+                if override_bpm:
+                    speed = max(0.0, float(self._state.bpm)) / 60.0
+                    step = speed * dt
+                    if motion_name in ("right-to-left", "bottom-to-top"):
+                        step = -step
+                    self._state.lines_offset = (self._state.lines_offset + step) % 1.0
+                else:
+                    phase = self._state.beat_phase % 1.0
+                    if motion_name in ("right-to-left", "bottom-to-top"):
+                        phase = (-phase) % 1.0
+                    self._state.lines_offset = phase
 
             return replace(self._state)

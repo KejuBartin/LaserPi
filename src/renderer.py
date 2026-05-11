@@ -1,4 +1,5 @@
 import math
+import random
 
 import pygame
 
@@ -133,4 +134,41 @@ def create_parallel_lines_surface(
             color = color_fn((t1 / gradient_zoom) % 1.0)
             pygame.draw.line(surface, color, (x1, y1), (x2, y2), line_width)
 
+    return surface
+
+
+def create_dots_surface(
+    size,
+    dot_count,
+    line_width,
+    color_fn,
+):
+    width, height = size
+    width = max(1, int(width))
+    height = max(1, int(height))
+    dot_count = max(1, int(dot_count))
+    line_width = max(1, int(line_width))
+    
+    surface = pygame.Surface((width, height), pygame.SRCALPHA)
+    
+    center_x = width / 2.0
+    center_y = height / 2.0
+    
+    # Draw center dot
+    color = color_fn(0.0)
+    pygame.draw.circle(surface, color, (int(center_x), int(center_y)), line_width)
+    
+    # Draw random dots (dot_count includes the center, so draw dot_count - 1 random)
+    for i in range(max(0, dot_count - 1)):
+        # Random position across screen
+        rand_x = random.randint(0, width - 1)
+        rand_y = random.randint(0, height - 1)
+        
+        # Color based on dot index for variety
+        color_phase = (i + 2) / (dot_count + 1)
+        color = color_fn(color_phase)
+        
+        # Draw dot
+        pygame.draw.circle(surface, color, (rand_x, rand_y), line_width)
+    
     return surface

@@ -132,6 +132,45 @@ def render_grow(source_surface, state):
     return grown_surface
 
 
+@register_effect("bounce")
+def render_bounce(source_surface, state):
+    phase = state.lines_offset % 1.0
+    # Oscillate between -1.0 and 1.0 using triangle wave
+    if phase < 0.5:
+        t = phase * 2.0  # 0 to 1
+    else:
+        t = (1.0 - phase) * 2.0  # 1 to 0
+
+    oscillation = t * 2.0 - 1.0  # -1 to 1
+
+    direction = getattr(state, "bounce_direction", "horizontal")
+    bounce_range = max(0.0, min(1.0, float(getattr(state, "bounce_range", 1.0))))
+    src_width, src_height = source_surface.get_size()
+
+    viewport_width = max(src_width, int(getattr(state, "viewport_width", src_width) or src_width))
+    viewport_height = max(src_height, int(getattr(state, "viewport_height", src_height) or src_height))
+
+    max_dx = max(0.0, (viewport_width - src_width) / 2.0) * bounce_range
+    max_dy = max(0.0, (viewport_height - src_height) / 2.0) * bounce_range
+
+    if direction == "vertical":
+        bounce_height = src_height + int(math.ceil(max_dy * 2.0))
+        bounce_width = src_width
+        bounced = pygame.Surface((bounce_width, bounce_height), pygame.SRCALPHA)
+        center_y = bounce_height / 2.0
+        src_y = int(round(center_y - src_height / 2.0 + oscillation * max_dy))
+        bounced.blit(source_surface, (0, src_y))
+    else:  # horizontal
+        bounce_width = src_width + int(math.ceil(max_dx * 2.0))
+        bounce_height = src_height
+        bounced = pygame.Surface((bounce_width, bounce_height), pygame.SRCALPHA)
+        center_x = bounce_width / 2.0
+        src_x = int(round(center_x - src_width / 2.0 + oscillation * max_dx))
+        bounced.blit(source_surface, (src_x, 0))
+
+    return bounced
+
+
 @register_motion_effect("left-to-right")
 def render_left_to_right(source_surface, state):
     return _translate_surface(source_surface, offset_x=state.lines_offset * source_surface.get_width())
