@@ -8,5 +8,9 @@ This does NOT work on Raspberry Pi OS Lite. You WILL get a black screen when the
 - `pygame` or `pygame-ce`
 - `aalink`
 
+## Control surface
+- Open the built-in web UI from another device on the LAN to switch shapes, effects, palettes, BPM, and rotation speed.
+- All live inputs update a shared state object, so BPM and OSC integration can hook into the same control path later.
+
 ## Additional information
 LaserPi is currently under development and nowhere near finished.
