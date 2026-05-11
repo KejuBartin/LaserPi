@@ -1,0 +1,136 @@
+import math
+
+import pygame
+
+from colors import rainbow
+
+
+def create_gradient_outline_surface(
+    points,
+    line_width=6,
+    segments_per_edge=100,
+    closed=True,
+    color_fn=rainbow
+):
+    if len(points) < 2:
+        raise ValueError("At least two points are required to render an outline")
+
+    line_width = max(1, int(line_width))
+    segments_per_edge = max(1, int(segments_per_edge))
+
+    # --------------------------------
+    # Center points on their centroid and compute bounds
+    # --------------------------------
+    n = len(points)
+    cx = sum(p.x for p in points) / n
+    cy = sum(p.y for p in points) / n
+
+    rel_points = [pygame.Vector2(p.x - cx, p.y - cy) for p in points]
+
+    max_distance = max(p.length() for p in rel_points)
+    canvas_size = max(1, math.ceil(max_distance * 2 + line_width * 6))
+
+    # --------------------------------
+    # Create transparent surface
+    # --------------------------------
+    surface = pygame.Surface((canvas_size, canvas_size), pygame.SRCALPHA)
+
+    # place centroid at the center of the surface
+    center_shift = pygame.Vector2(canvas_size / 2.0, canvas_size / 2.0)
+
+    offset_points = [r + center_shift for r in rel_points]
+
+    edge_count = len(offset_points)
+
+    max_edges = edge_count if closed else edge_count - 1
+
+    # --------------------------------
+    # Draw gradient outline
+    # --------------------------------
+    for edge in range(max_edges):
+        start = offset_points[edge]
+        end = offset_points[(edge + 1) % edge_count]
+
+        for i in range(segments_per_edge):
+            t1 = i / segments_per_edge
+            t2 = (i + 1) / segments_per_edge
+
+            p1 = start.lerp(end, t1)
+            p2 = start.lerp(end, t2)
+
+            gradient_pos = (edge + t1) / edge_count
+
+            color = color_fn(gradient_pos)
+
+            pygame.draw.line(
+                surface,
+                color,
+                p1,
+                p2,
+                line_width
+            )
+
+    return surface
+
+
+def create_parallel_lines_surface(
+    size,
+    line_count,
+    angle_deg,
+    line_width,
+    color_fn,
+    offset=0.0,
+    segments_per_line=100,
+    gradient_zoom=1.0,
+):
+    width, height = size
+    width = max(1, int(width))
+    height = max(1, int(height))
+    line_count = max(1, int(line_count))
+    line_width = max(1, int(line_width))
+    segments_per_line = max(1, int(segments_per_line))
+    gradient_zoom = float(gradient_zoom)
+    gradient_zoom = max(0.01, gradient_zoom)
+
+    surface = pygame.Surface((width, height), pygame.SRCALPHA)
+
+    angle_rad = math.radians(float(angle_deg) % 360.0)
+    dx = math.cos(angle_rad)
+    dy = math.sin(angle_rad)
+    px = -dy
+    py = dx
+
+    perpendicular_extent = (abs(px) * width + abs(py) * height) / 2.0
+    line_extent = (abs(dx) * width + abs(dy) * height) / 2.0
+    spacing = max(1.0, (perpendicular_extent * 2.0) / line_count)
+    center_x = width / 2.0
+    center_y = height / 2.0
+
+    offset = (float(offset) % 1.0) * spacing
+    half_range = int(math.ceil(perpendicular_extent / spacing)) + line_count + 4
+    segment = line_extent * 2.0 + line_width * 4.0
+    sample_segments = max(segments_per_line, int(math.ceil(segments_per_line / gradient_zoom)))
+
+    for i in range(-half_range, half_range + 1):
+        distance = i * spacing + offset
+        line_center_x = center_x + px * distance
+        line_center_y = center_y + py * distance
+
+        start_x = line_center_x - dx * segment
+        start_y = line_center_y - dy * segment
+        end_x = line_center_x + dx * segment
+        end_y = line_center_y + dy * segment
+
+        for s in range(sample_segments):
+            t1 = s / sample_segments
+            t2 = (s + 1) / sample_segments
+
+            x1 = start_x + (end_x - start_x) * t1
+            y1 = start_y + (end_y - start_y) * t1
+            x2 = start_x + (end_x - start_x) * t2
+            y2 = start_y + (end_y - start_y) * t2
+
+            color = color_fn((t1 / gradient_zoom) % 1.0)
+            pygame.draw.line(surface, color, (x1, y1), (x2, y2), line_width)
+
+    return surface
