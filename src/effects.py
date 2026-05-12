@@ -147,28 +147,41 @@ def render_bounce(source_surface, state):
     bounce_range = max(0.0, min(1.0, float(getattr(state, "bounce_range", 1.0))))
     src_width, src_height = source_surface.get_size()
 
-    viewport_width = max(src_width, int(getattr(state, "viewport_width", src_width) or src_width))
-    viewport_height = max(src_height, int(getattr(state, "viewport_height", src_height) or src_height))
+    # Prefer the configured viewport size from shared state. Do NOT inflate
+    # the viewport to the source surface size; otherwise large source
+    # surfaces would eliminate any travel range and the bounce would appear
+    # static. Fall back to the source size only if viewport is unset.
+    viewport_width = int(getattr(state, "viewport_width", 0) or 0)
+    viewport_height = int(getattr(state, "viewport_height", 0) or 0)
+    if viewport_width <= 0:
+        viewport_width = src_width
+    if viewport_height <= 0:
+        viewport_height = src_height
 
     max_dx = max(0.0, (viewport_width - src_width) / 2.0) * bounce_range
     max_dy = max(0.0, (viewport_height - src_height) / 2.0) * bounce_range
 
+    # Render onto a fixed-size viewport surface so internal source size
+    # changes cannot shift the global placement. Position the source
+    # within the viewport using the computed oscillation.
+    bounced = pygame.Surface((viewport_width, viewport_height), pygame.SRCALPHA)
+
     if direction == "vertical":
-        bounce_height = src_height + int(math.ceil(max_dy * 2.0))
-        bounce_width = src_width
-        bounced = pygame.Surface((bounce_width, bounce_height), pygame.SRCALPHA)
-        center_y = bounce_height / 2.0
+        center_y = viewport_height / 2.0
         src_y = int(round(center_y - src_height / 2.0 + oscillation * max_dy))
-        bounced.blit(source_surface, (0, src_y))
+        src_x = int(round((viewport_width - src_width) / 2.0))
+        bounced.blit(source_surface, (src_x, src_y))
     else:  # horizontal
-        bounce_width = src_width + int(math.ceil(max_dx * 2.0))
-        bounce_height = src_height
-        bounced = pygame.Surface((bounce_width, bounce_height), pygame.SRCALPHA)
-        center_x = bounce_width / 2.0
+        center_x = viewport_width / 2.0
         src_x = int(round(center_x - src_width / 2.0 + oscillation * max_dx))
-        bounced.blit(source_surface, (src_x, 0))
+        src_y = int(round((viewport_height - src_height) / 2.0))
+        bounced.blit(source_surface, (src_x, src_y))
 
     return bounced
+
+
+def _triangle_01(value):
+    return 1.0 - abs(2.0 * (float(value) % 1.0) - 1.0)
 
 
 @register_motion_effect("left-to-right")
@@ -189,3 +202,31 @@ def render_top_to_bottom(source_surface, state):
 @register_motion_effect("bottom-to-top")
 def render_bottom_to_top(source_surface, state):
     return _translate_surface(source_surface, offset_y=state.lines_offset * source_surface.get_height())
+
+
+@register_effect("dvd")
+def render_dvd(source_surface, state):
+    bounce_range = max(0.0, min(1.0, float(getattr(state, "bounce_range", 1.0))))
+    src_width, src_height = source_surface.get_size()
+
+    viewport_width = int(getattr(state, "viewport_width", 0) or 0)
+    viewport_height = int(getattr(state, "viewport_height", 0) or 0)
+    if viewport_width <= 0:
+        viewport_width = src_width
+    if viewport_height <= 0:
+        viewport_height = src_height
+
+    max_dx = max(0.0, (viewport_width - src_width) / 2.0) * bounce_range
+    max_dy = max(0.0, (viewport_height - src_height) / 2.0) * bounce_range
+
+    # Use dedicated DVD positions from shared state (normalized 0..1).
+    bx = float(getattr(state, "dvd_pos_x", 0.5))
+    by = float(getattr(state, "dvd_pos_y", 0.5))
+
+    bounced = pygame.Surface((viewport_width, viewport_height), pygame.SRCALPHA)
+
+    src_x = int(round((viewport_width - src_width) / 2.0 + (bx - 0.5) * 2.0 * max_dx))
+    src_y = int(round((viewport_height - src_height) / 2.0 + (by - 0.5) * 2.0 * max_dy))
+    bounced.blit(source_surface, (src_x, src_y))
+
+    return bounced

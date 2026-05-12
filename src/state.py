@@ -1,5 +1,7 @@
 from dataclasses import asdict, dataclass, field, replace
 from threading import Lock
+import math
+import random
 
 
 @dataclass
@@ -13,6 +15,8 @@ class LaserState:
     bounce_direction: str = "horizontal"
     bounce_range: float = 1.0
     shape_name: str = "square"
+    # dvd effect speed multiplier (0.25, 0.5, 1.0)
+    dvd_speed: float = 0.5
     color_name: str = "rainbow"
     bpm: float = 120.0
     rotation_speed: float = 90.0
@@ -42,6 +46,18 @@ class LaserState:
     
     # dots shape parameters
     dot_count: int = 5
+    # bounce simulation state (normalized 0..1 across viewport)
+    bounce_pos_x: float = 0.5
+    bounce_pos_y: float = 0.5
+    bounce_vx: float = 0.0
+    bounce_vy: float = 0.0
+
+    # dvd simulation state (normalized 0..1 across viewport)
+    dvd_pos_x: float = 0.5
+    dvd_pos_y: float = 0.5
+    dvd_vx: float = 0.0
+    dvd_vy: float = 0.0
+    dvd_time: float = 0.0
 
 
 class SharedLaserState:
@@ -93,17 +109,87 @@ class SharedLaserState:
             override_bpm = bool(getattr(self._state, "motion_override_bpm", False))
             effects = getattr(self._state, "effect_names", None) or [getattr(self._state, "effect_name", "static")]
             bounce_active = "bounce" in effects
-            if motion_name != "none" or bounce_active:
-                if override_bpm:
-                    speed = max(0.0, float(self._state.bpm)) / 60.0
-                    step = speed * dt
-                    if motion_name in ("right-to-left", "bottom-to-top"):
-                        step = -step
-                    self._state.lines_offset = (self._state.lines_offset + step) % 1.0
-                else:
-                    phase = self._state.beat_phase % 1.0
-                    if motion_name in ("right-to-left", "bottom-to-top"):
-                        phase = (-phase) % 1.0
-                    self._state.lines_offset = phase
+            dvd_active = "dvd" in effects
+            if motion_name != "none" or bounce_active or dvd_active:
+                # Advance lines_offset continuously to avoid abrupt jumps when
+                # external beat_phase updates occur (e.g. Ableton Link). Use the
+                # current BPM as the rate for both override and synced modes so
+                # motion stays smooth and infinite.
+                speed = max(0.0, float(self._state.bpm)) / 60.0
+                step = speed * dt
+                if motion_name in ("right-to-left", "bottom-to-top"):
+                    step = -step
+                self._state.lines_offset = (self._state.lines_offset + step) % 1.0
+
+            # Bounce physics: maintain a normalized position and velocity in the
+            # shared state and reflect on the 0..1 bounds so that the movement
+            # behaves like a mirror (angle of incidence == angle of reflection).
+            if bounce_active:
+                # Initialize velocity if zero: pick a diagonal direction by
+                # default, scaled by `motion_speed`. Use a random angle so
+                # multiple restarts don't all bounce identically.
+                if abs(self._state.bounce_vx) < 1e-9 and abs(self._state.bounce_vy) < 1e-9:
+                    ang = random.random() * 2.0 * math.tau
+                    self._state.bounce_vx = math.cos(ang) * float(self._state.motion_speed)
+                    self._state.bounce_vy = math.sin(ang) * float(self._state.motion_speed)
+
+                # Integrate position
+                px = float(self._state.bounce_pos_x) + self._state.bounce_vx * dt
+                py = float(self._state.bounce_pos_y) + self._state.bounce_vy * dt
+
+                # Reflect on bounds [0..1]. Use a loop so a large step that
+                # crosses multiple edges in one frame still resolves correctly
+                # instead of jumping to the opposite side.
+                while px < 0.0 or px > 1.0:
+                    if px < 0.0:
+                        px = -px
+                        self._state.bounce_vx = -self._state.bounce_vx
+                    elif px > 1.0:
+                        px = 2.0 - px
+                        self._state.bounce_vx = -self._state.bounce_vx
+
+                while py < 0.0 or py > 1.0:
+                    if py < 0.0:
+                        py = -py
+                        self._state.bounce_vy = -self._state.bounce_vy
+                    elif py > 1.0:
+                        py = 2.0 - py
+                        self._state.bounce_vy = -self._state.bounce_vy
+
+                self._state.bounce_pos_x = px
+                self._state.bounce_pos_y = py
+
+            if dvd_active:
+                if abs(self._state.dvd_vx) < 1e-9 and abs(self._state.dvd_vy) < 1e-9:
+                    ang = random.random() * 2.0 * math.tau
+                    self._state.dvd_vx = math.cos(ang)
+                    self._state.dvd_vy = math.sin(ang)
+
+                # Scale DVD speed by BPM so the BPM slider controls motion speed.
+                # dvd_speed acts as a multiplier on top of the BPM-derived speed.
+                bpm = max(0.0, float(self._state.bpm))
+                speed = (bpm / 60.0) * max(0.0, float(self._state.dvd_speed))
+                self._state.dvd_time += dt * speed
+                px = float(self._state.dvd_pos_x) + self._state.dvd_vx * speed * dt
+                py = float(self._state.dvd_pos_y) + self._state.dvd_vy * speed * dt
+
+                while px < 0.0 or px > 1.0:
+                    if px < 0.0:
+                        px = -px
+                        self._state.dvd_vx = -self._state.dvd_vx
+                    elif px > 1.0:
+                        px = 2.0 - px
+                        self._state.dvd_vx = -self._state.dvd_vx
+
+                while py < 0.0 or py > 1.0:
+                    if py < 0.0:
+                        py = -py
+                        self._state.dvd_vy = -self._state.dvd_vy
+                    elif py > 1.0:
+                        py = 2.0 - py
+                        self._state.dvd_vy = -self._state.dvd_vy
+
+                self._state.dvd_pos_x = px
+                self._state.dvd_pos_y = py
 
             return replace(self._state)

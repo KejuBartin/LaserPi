@@ -192,6 +192,12 @@ HTML = """<!doctype html>
           <label for="bounce_range" id="bounce_range_label" class="hidden">Bounce Space</label>
           <input id="bounce_range" class="hidden" type="range" min="0" max="1" step="0.01">
           <input id="bounce_range_value" class="hidden" type="number" min="0" max="1" step="0.01">
+          <label for="dvd_speed" id="dvd_speed_label" class="hidden">DVD Speed</label>
+          <select id="dvd_speed" class="hidden">
+            <option value="0.25">0.25x</option>
+            <option value="0.5" selected>0.5x</option>
+            <option value="1.0">1.0x</option>
+          </select>
         </div>
       </section>
       <section class="card">
@@ -283,8 +289,29 @@ HTML = """<!doctype html>
     const bounceRange = document.getElementById('bounce_range');
     const bounceRangeValue = document.getElementById('bounce_range_value');
     const bounceRangeLabel = document.getElementById('bounce_range_label');
+    const dvdSpeed = document.getElementById('dvd_speed');
+    const dvdSpeedLabel = document.getElementById('dvd_speed_label');
     const motionOverrideBpm = document.getElementById('motion_override_bpm');
     const effectSummary = document.getElementById('effect_summary');
+    const dvdSpeedOptions = ['0.25', '0.5', '1.0'];
+
+    function normalizeDvdSpeedValue(value) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) {
+        return '0.5';
+      }
+
+      let closest = dvdSpeedOptions[0];
+      let smallestDistance = Infinity;
+      for (const option of dvdSpeedOptions) {
+        const distance = Math.abs(Number(option) - numeric);
+        if (distance < smallestDistance) {
+          smallestDistance = distance;
+          closest = option;
+        }
+      }
+      return closest;
+    }
 
     const options = {
       effects: document.getElementById('effects'),
@@ -397,6 +424,10 @@ HTML = """<!doctype html>
         ...(state.motion_name && state.motion_name !== 'none' ? [state.motion_name] : []),
       ].join(', ');
       stateView.textContent = JSON.stringify(state, null, 2);
+        const dvdActive = !!(state.effect_names?.includes('dvd') || state.effect_name === 'dvd');
+        dvdSpeed.value = normalizeDvdSpeedValue(state.dvd_speed ?? 0.5);
+        dvdSpeed.classList.toggle('hidden', !dvdActive);
+        dvdSpeedLabel.classList.toggle('hidden', !dvdActive);
     }
 
     bpmInput.addEventListener('input', () => {
@@ -462,6 +493,8 @@ HTML = """<!doctype html>
     });
     bounceRange.addEventListener('change', () => apply({bounce_range: Number(bounceRange.value)}));
     bounceRangeValue.addEventListener('change', () => apply({bounce_range: Number(bounceRangeValue.value)}));
+
+    dvdSpeed.addEventListener('change', () => apply({dvd_speed: Number(dvdSpeed.value)}));
 
     refresh();
   </script>
@@ -579,6 +612,8 @@ def _build_handler(control_state):
                 updates["bounce_direction"] = str(payload["bounce_direction"])
             if "bounce_range" in payload:
               updates["bounce_range"] = max(0.0, min(1.0, float(payload["bounce_range"])))
+            if "dvd_speed" in payload:
+              updates["dvd_speed"] = max(0.0, float(payload["dvd_speed"]))
 
             if "line_width" in payload:
                 updates["line_width"] = max(1, int(payload["line_width"]))

@@ -4,7 +4,7 @@ from collections import OrderedDict
 
 from colors import get_color_function
 from effects import apply_effect_chain
-from renderer import create_gradient_outline_surface, create_parallel_lines_surface, create_dots_surface
+from renderer import create_gradient_outline_surface, create_parallel_lines_surface, create_dots_surface, create_dvd_dots_surface
 from shapes import get_shape_preset
 from state import SharedLaserState
 from web_control import start_web_server
@@ -150,8 +150,12 @@ try:
         # Update
         # --------------------------------
         snapshot = control_state.advance_timing(dt)
+        effect_names = snapshot.effect_names or ([snapshot.effect_name] if snapshot.effect_name else ["static"])
+        has_dvd = "dvd" in effect_names
 
-        if snapshot.shape_name == "multilines":
+        if snapshot.shape_name == "dots" and has_dvd:
+            shape_surface = None
+        elif snapshot.shape_name == "multilines":
             shape_surface = build_shape_surface(snapshot)
         else:
             cache_key = (
@@ -172,8 +176,6 @@ try:
                 surface_cache[cache_key] = shape_surface
                 while len(surface_cache) > CACHE_LIMIT:
                     surface_cache.popitem(last=False)
-
-        effect_names = snapshot.effect_names or ([snapshot.effect_name] if snapshot.effect_name else ["static"])
 
         # --------------------------------
         # Render
@@ -203,7 +205,21 @@ try:
 
         screen.set_clip(crop_rect)
 
-        effected_surface = apply_effect_chain(shape_surface, snapshot, effect_names)
+        if snapshot.shape_name == "dots" and has_dvd:
+            color_fn = get_color_function(snapshot.color_name, snapshot.solid_color)
+            effected_surface = create_dvd_dots_surface(
+                (WIDTH, HEIGHT),
+                dot_count=snapshot.dot_count,
+                line_width=snapshot.line_width,
+                color_fn=color_fn,
+                time_phase=snapshot.dvd_time,
+                travel=snapshot.bounce_range,
+            )
+            remaining_effects = [name for name in effect_names if name != "dvd"]
+            if remaining_effects:
+                effected_surface = apply_effect_chain(effected_surface, snapshot, remaining_effects)
+        else:
+            effected_surface = apply_effect_chain(shape_surface, snapshot, effect_names)
 
         if snapshot.motion_name and snapshot.motion_name != "none":
             blit_motion_wrapped(screen, effected_surface, snapshot.motion_name, snapshot.lines_offset)

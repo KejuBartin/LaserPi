@@ -172,3 +172,51 @@ def create_dots_surface(
         pygame.draw.circle(surface, color, (rand_x, rand_y), line_width)
     
     return surface
+
+
+def _triangle_01(value):
+    return 1.0 - abs(2.0 * (float(value) % 1.0) - 1.0)
+
+
+def create_dvd_dots_surface(
+    size,
+    dot_count,
+    line_width,
+    color_fn,
+    time_phase,
+    travel=1.0,
+):
+    width, height = size
+    width = max(1, int(width))
+    height = max(1, int(height))
+    dot_count = max(1, int(dot_count))
+    line_width = max(1, int(line_width))
+    travel = max(0.0, min(1.0, float(travel)))
+
+    surface = pygame.Surface((width, height), pygame.SRCALPHA)
+    max_x = max(0.0, (width - line_width * 2) * travel)
+    max_y = max(0.0, (height - line_width * 2) * travel)
+
+    for i in range(dot_count):
+        if i == 0:
+            phase_x = 0.25
+            phase_y = 0.25
+            speed_x = 1.0
+            speed_y = 1.37
+        else:
+            phase_x = (0.173 * i + 0.31) % 1.0
+            phase_y = (0.271 * i + 0.57) % 1.0
+            speed_x = 0.7 + ((i * 37) % 70) / 100.0
+            speed_y = 0.9 + ((i * 53) % 90) / 100.0
+
+        tx = _triangle_01(time_phase * speed_x + phase_x)
+        ty = _triangle_01(time_phase * speed_y + phase_y)
+
+        x = int(round(line_width + tx * max_x))
+        y = int(round(line_width + ty * max_y))
+
+        color_phase = (i + 1) / (dot_count + 1)
+        color = color_fn(color_phase)
+        pygame.draw.circle(surface, color, (x, y), line_width)
+
+    return surface
