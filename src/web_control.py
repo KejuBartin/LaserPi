@@ -173,6 +173,11 @@ HTML = """<!doctype html>
           <input id="dot_count" type="range" min="1" max="50" step="1">
           <input id="dot_count_value" type="number" min="1" max="50" step="1">
         </div>
+        <div class="field hidden" id="shape_size_controls">
+          <label for="shape_size">Size</label>
+          <input id="shape_size" type="range" min="0.1" max="3.0" step="0.1">
+          <input id="shape_size_value" type="number" min="0.1" max="3.0" step="0.1">
+        </div>
       </section>
       <section class="card">
         <h2>Effect</h2>
@@ -284,6 +289,9 @@ HTML = """<!doctype html>
     const dotsControls = document.getElementById('dots_controls');
     const dotCount = document.getElementById('dot_count');
     const dotCountValue = document.getElementById('dot_count_value');
+    const shapeSizeControls = document.getElementById('shape_size_controls');
+    const shapeSize = document.getElementById('shape_size');
+    const shapeSizeValue = document.getElementById('shape_size_value');
     const bounceDirection = document.getElementById('bounce_direction');
     const bounceDirectionLabel = document.getElementById('bounce_direction_label');
     const bounceRange = document.getElementById('bounce_range');
@@ -410,6 +418,10 @@ HTML = """<!doctype html>
       dotsControls.classList.toggle('hidden', state.shape_name !== 'dots');
       dotCount.value = state.dot_count ?? 5;
       dotCountValue.value = state.dot_count ?? 5;
+      const shapeHasSize = ['circle', 'line', 'square', 'triangle'].includes(state.shape_name);
+      shapeSizeControls.classList.toggle('hidden', !shapeHasSize);
+      shapeSize.value = state.shape_size ?? 1.0;
+      shapeSizeValue.value = Number(state.shape_size ?? 1.0).toFixed(1);
       const bounceActive = !!(state.effect_names?.includes('bounce') || state.effect_name === 'bounce');
       bounceDirection.value = state.bounce_direction ?? 'horizontal';
       bounceDirection.classList.toggle('hidden', !bounceActive);
@@ -486,6 +498,12 @@ HTML = """<!doctype html>
     });
     dotCount.addEventListener('change', () => apply({dot_count: Number(dotCount.value)}));
     dotCountValue.addEventListener('change', () => apply({dot_count: Number(dotCountValue.value)}));
+
+    shapeSize.addEventListener('input', () => {
+      shapeSizeValue.value = Number(shapeSize.value).toFixed(1);
+    });
+    shapeSize.addEventListener('change', () => apply({shape_size: Number(shapeSize.value)}));
+    shapeSizeValue.addEventListener('change', () => apply({shape_size: Number(shapeSizeValue.value)}));
 
     bounceDirection.addEventListener('change', () => apply({bounce_direction: bounceDirection.value}));
     bounceRange.addEventListener('input', () => {
@@ -614,6 +632,8 @@ def _build_handler(control_state):
               updates["bounce_range"] = max(0.0, min(1.0, float(payload["bounce_range"])))
             if "dvd_speed" in payload:
               updates["dvd_speed"] = max(0.0, float(payload["dvd_speed"]))
+            if "shape_size" in payload:
+              updates["shape_size"] = max(0.1, min(3.0, float(payload["shape_size"])))
 
             if "line_width" in payload:
                 updates["line_width"] = max(1, int(payload["line_width"]))

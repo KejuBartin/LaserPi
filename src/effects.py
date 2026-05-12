@@ -128,7 +128,9 @@ def render_grow(source_surface, state):
     min_scale = 0.12
     max_scale = 3.2
     scale = min_scale + (max_scale - min_scale) * phase
-    grown_surface = pygame.transform.rotozoom(source_surface, 0.0, _clamp_scale(state.scale * scale))
+    shape_size = max(0.1, float(getattr(state, "shape_size", 1.0)))
+    grown_scale = state.scale * scale / shape_size
+    grown_surface = pygame.transform.rotozoom(source_surface, 0.0, max(0.01, float(grown_scale)))
     return grown_surface
 
 

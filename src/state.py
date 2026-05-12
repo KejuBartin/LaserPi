@@ -46,6 +46,8 @@ class LaserState:
     
     # dots shape parameters
     dot_count: int = 5
+    # shape size multiplier for circle, line, square, triangle
+    shape_size: float = 1.0
     # bounce simulation state (normalized 0..1 across viewport)
     bounce_pos_x: float = 0.5
     bounce_pos_y: float = 0.5

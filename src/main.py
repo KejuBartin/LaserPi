@@ -102,6 +102,11 @@ def build_shape_surface(snapshot):
         )
 
     shape_points = preset.factory()
+    
+    # Apply shape size multiplier
+    shape_size = max(0.1, float(getattr(snapshot, "shape_size", 1.0)))
+    if shape_size != 1.0:
+        shape_points = [pygame.Vector2(p.x * shape_size, p.y * shape_size) for p in shape_points]
 
     if snapshot.shape_name == "line":
         angle_rad = math.radians(float(snapshot.line_angle) % 360.0)
@@ -163,6 +168,7 @@ try:
                 snapshot.color_name,
                 snapshot.solid_color,
                 snapshot.line_width,
+                round(float(getattr(snapshot, "shape_size", 1.0)), 3),
                 snapshot.segments_per_edge,
                 snapshot.line_angle,
                 snapshot.dot_count if snapshot.shape_name == "dots" else 0,
