@@ -1,4 +1,5 @@
 import math
+from collections import OrderedDict
 from collections.abc import Callable
 
 import pygame
@@ -11,6 +12,9 @@ EffectRenderer = Callable[[pygame.Surface, LaserState], pygame.Surface]
 
 EFFECTS: dict[str, EffectRenderer] = {}
 MOTION_EFFECTS: dict[str, EffectRenderer] = {}
+_SCALE_CACHE = OrderedDict()
+_SCALE_CACHE_PIXELS = 0
+_SCALE_CACHE_PIXEL_LIMIT = 12_000_000
 
 
 def register_effect(name):
@@ -63,6 +67,39 @@ def _clamp_scale(scale, maximum=4.0):
     return min(maximum, max(0.01, float(scale)))
 
 
+def _cached_rotozoom(source_surface, angle, scale):
+    global _SCALE_CACHE_PIXELS
+
+    scale = max(0.01, float(scale))
+    width, height = source_surface.get_size()
+    cache_key = (
+        id(source_surface),
+        width,
+        height,
+        round(float(angle), 3),
+        max(1, int(round(width * scale))),
+        max(1, int(round(height * scale))),
+    )
+
+    if cache_key in _SCALE_CACHE:
+        cached_surface, cached_pixels = _SCALE_CACHE.pop(cache_key)
+        _SCALE_CACHE[cache_key] = (cached_surface, cached_pixels)
+        return cached_surface
+
+    scaled_surface = pygame.transform.rotozoom(source_surface, angle, scale)
+    scaled_width, scaled_height = scaled_surface.get_size()
+    scaled_pixels = scaled_width * scaled_height
+
+    if scaled_pixels <= _SCALE_CACHE_PIXEL_LIMIT:
+        _SCALE_CACHE[cache_key] = (scaled_surface, scaled_pixels)
+        _SCALE_CACHE_PIXELS += scaled_pixels
+        while _SCALE_CACHE and _SCALE_CACHE_PIXELS > _SCALE_CACHE_PIXEL_LIMIT:
+            _, (_, evicted_pixels) = _SCALE_CACHE.popitem(last=False)
+            _SCALE_CACHE_PIXELS -= evicted_pixels
+
+    return scaled_surface
+
+
 def _translate_surface(source_surface, offset_x=0, offset_y=0):
     width, height = source_surface.get_size()
     translated_surface = pygame.Surface((width, height), pygame.SRCALPHA)
@@ -108,7 +145,7 @@ def render_rotating(source_surface, state):
 @register_effect("pulse")
 def render_pulsing(source_surface, state):
     pulse = 0.90 + 0.10 * (0.5 - 0.5 * math.cos(math.tau * state.beat_phase))
-    scaled_surface = pygame.transform.rotozoom(source_surface, 0.0, state.scale * pulse)
+    scaled_surface = _cached_rotozoom(source_surface, 0.0, state.scale * pulse)
     return scaled_surface
 
 
@@ -130,7 +167,7 @@ def render_grow(source_surface, state):
     scale = min_scale + (max_scale - min_scale) * phase
     shape_size = max(0.1, float(getattr(state, "shape_size", 1.0)))
     grown_scale = state.scale * scale / shape_size
-    grown_surface = pygame.transform.rotozoom(source_surface, 0.0, max(0.01, float(grown_scale)))
+    grown_surface = _cached_rotozoom(source_surface, 0.0, grown_scale)
     return grown_surface
 
 

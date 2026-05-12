@@ -67,9 +67,14 @@ class SharedLaserState:
         self._state = initial_state or LaserState()
         self._lock = Lock()
 
+    def _copy_state(self):
+        snapshot = replace(self._state)
+        snapshot.effect_names = list(self._state.effect_names)
+        return snapshot
+
     def snapshot(self):
         with self._lock:
-            return replace(self._state)
+            return self._copy_state()
 
     def snapshot_dict(self):
         with self._lock:
@@ -97,7 +102,7 @@ class SharedLaserState:
             if not self._state.effect_names:
                 self._state.effect_names = [self._state.effect_name]
 
-            return replace(self._state)
+            return self._copy_state()
 
     def advance_timing(self, dt):
         with self._lock:
@@ -117,7 +122,7 @@ class SharedLaserState:
                 # external beat_phase updates occur (e.g. Ableton Link). Use the
                 # current BPM as the rate for both override and synced modes so
                 # motion stays smooth and infinite.
-                speed = max(0.0, float(self._state.bpm)) / 60.0
+                speed = (max(0.0, float(self._state.bpm)) / 60.0) * max(0.0, float(self._state.motion_speed))
                 step = speed * dt
                 if motion_name in ("right-to-left", "bottom-to-top"):
                     step = -step
@@ -194,4 +199,4 @@ class SharedLaserState:
                 self._state.dvd_pos_x = px
                 self._state.dvd_pos_y = py
 
-            return replace(self._state)
+            return self._copy_state()

@@ -2,7 +2,7 @@ import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from colors import list_color_names
+from colors import list_color_names, parse_hex_color
 from effects import list_effect_names, list_motion_names
 from shapes import list_shape_names
 
@@ -302,6 +302,7 @@ HTML = """<!doctype html>
     const motionOverrideBpm = document.getElementById('motion_override_bpm');
     const effectSummary = document.getElementById('effect_summary');
     const dvdSpeedOptions = ['0.25', '0.5', '1.0'];
+    let solidColorTimer = null;
 
     function normalizeDvdSpeedValue(value) {
       const numeric = Number(value);
@@ -453,7 +454,14 @@ HTML = """<!doctype html>
       apply({output_enabled: !s.output_enabled});
     });
 
-    solidColor.addEventListener('input', () => apply({color_name: 'solid', solid_color: solidColor.value}));
+    solidColor.addEventListener('input', () => {
+      clearTimeout(solidColorTimer);
+      solidColorTimer = setTimeout(() => apply({color_name: 'solid', solid_color: solidColor.value}), 80);
+    });
+    solidColor.addEventListener('change', () => {
+      clearTimeout(solidColorTimer);
+      apply({color_name: 'solid', solid_color: solidColor.value});
+    });
 
     cropLeft.addEventListener('change', () => apply({crop_left: Number(cropLeft.value)}));
     cropRight.addEventListener('change', () => apply({crop_right: Number(cropRight.value)}));
@@ -521,6 +529,27 @@ HTML = """<!doctype html>
 """
 
 
+MAX_REQUEST_BYTES = 16 * 1024
+MAX_BPM = 300.0
+MAX_ROTATION_SPEED = 720.0
+MAX_LINE_WIDTH = 40
+MAX_SEGMENTS_PER_EDGE = 200
+MAX_LINES_COUNT = 64
+MAX_DOT_COUNT = 50
+
+
+def _parse_bool(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in ("1", "true", "yes", "on"):
+            return True
+        if lowered in ("0", "false", "no", "off"):
+            return False
+    return bool(value)
+
+
 def _build_handler(control_state):
     class LaserControlHandler(BaseHTTPRequestHandler):
         def _send_json(self, payload, status=200):
@@ -541,6 +570,8 @@ def _build_handler(control_state):
 
         def _read_json(self):
             content_length = int(self.headers.get("Content-Length", "0"))
+            if content_length > MAX_REQUEST_BYTES:
+                raise ValueError("Request body is too large")
             raw = self.rfile.read(content_length)
             if not raw:
                 return {}
@@ -576,10 +607,10 @@ def _build_handler(control_state):
                 updates["color_name"] = color_name
 
             if "bpm" in payload:
-                updates["bpm"] = float(payload["bpm"])
+                updates["bpm"] = max(0.0, min(MAX_BPM, float(payload["bpm"])))
 
             if "rotation_speed" in payload:
-                updates["rotation_speed"] = float(payload["rotation_speed"])
+                updates["rotation_speed"] = max(0.0, min(MAX_ROTATION_SPEED, float(payload["rotation_speed"])))
 
             if "motion_name" in payload:
                 motion_name = str(payload["motion_name"])
@@ -590,16 +621,18 @@ def _build_handler(control_state):
             if "motion_speed" in payload:
                 updates["motion_speed"] = max(0.0, float(payload["motion_speed"]))
             if "motion_override_bpm" in payload:
-              updates["motion_override_bpm"] = bool(payload["motion_override_bpm"])
+                updates["motion_override_bpm"] = _parse_bool(payload["motion_override_bpm"])
             if "motion_sync_to_bpm" in payload:
-              # Backward compatibility: old flag meant BPM-linked motion.
-              updates["motion_override_bpm"] = bool(payload["motion_sync_to_bpm"])
+                # Backward compatibility: old flag meant BPM-linked motion.
+                updates["motion_override_bpm"] = _parse_bool(payload["motion_sync_to_bpm"])
 
             if "output_enabled" in payload:
-                updates["output_enabled"] = bool(payload["output_enabled"])
+                updates["output_enabled"] = _parse_bool(payload["output_enabled"])
 
             if "solid_color" in payload:
-                updates["solid_color"] = str(payload["solid_color"])
+                solid_color = str(payload["solid_color"])
+                parse_hex_color(solid_color)
+                updates["solid_color"] = solid_color
 
             # crop values: normalized 0..1
             for key in ("crop_left", "crop_right", "crop_top", "crop_bottom"):
@@ -609,11 +642,11 @@ def _build_handler(control_state):
 
             # lines shape params
             if "lines_count" in payload:
-                updates["lines_count"] = max(1, int(payload["lines_count"]))
+                updates["lines_count"] = max(1, min(MAX_LINES_COUNT, int(payload["lines_count"])))
             if "lines_angle" in payload:
                 updates["lines_angle"] = float(payload["lines_angle"]) % 360.0
             if "line_angle" in payload:
-              updates["line_angle"] = float(payload["line_angle"]) % 360.0
+                updates["line_angle"] = float(payload["line_angle"]) % 360.0
             if "lines_speed" in payload:
                 updates["motion_speed"] = max(0.0, float(payload["lines_speed"]))
             if "lines_mode" in payload:
@@ -622,24 +655,24 @@ def _build_handler(control_state):
                     raise ValueError(f"Unknown motion effect: {motion_name}")
                 updates["motion_name"] = motion_name if motion_name != "rotate" else "none"
             if "lines_gradient_zoom" in payload:
-                updates["lines_gradient_zoom"] = max(0.01, float(payload["lines_gradient_zoom"]))
+                updates["lines_gradient_zoom"] = max(0.01, min(4.0, float(payload["lines_gradient_zoom"])))
 
             if "dot_count" in payload:
-                updates["dot_count"] = max(1, min(50, int(payload["dot_count"])))
+                updates["dot_count"] = max(1, min(MAX_DOT_COUNT, int(payload["dot_count"])))
             if "bounce_direction" in payload:
                 updates["bounce_direction"] = str(payload["bounce_direction"])
             if "bounce_range" in payload:
-              updates["bounce_range"] = max(0.0, min(1.0, float(payload["bounce_range"])))
+                updates["bounce_range"] = max(0.0, min(1.0, float(payload["bounce_range"])))
             if "dvd_speed" in payload:
-              updates["dvd_speed"] = max(0.0, float(payload["dvd_speed"]))
+                updates["dvd_speed"] = max(0.0, float(payload["dvd_speed"]))
             if "shape_size" in payload:
-              updates["shape_size"] = max(0.1, min(3.0, float(payload["shape_size"])))
+                updates["shape_size"] = max(0.1, min(3.0, float(payload["shape_size"])))
 
             if "line_width" in payload:
-                updates["line_width"] = max(1, int(payload["line_width"]))
+                updates["line_width"] = max(1, min(MAX_LINE_WIDTH, int(payload["line_width"])))
 
             if "segments_per_edge" in payload:
-                updates["segments_per_edge"] = max(1, int(payload["segments_per_edge"]))
+                updates["segments_per_edge"] = max(1, min(MAX_SEGMENTS_PER_EDGE, int(payload["segments_per_edge"])))
 
             if "scale" in payload:
                 updates["scale"] = max(0.1, float(payload["scale"]))
@@ -654,7 +687,7 @@ def _build_handler(control_state):
                 return self._send_json(
                     {
                         "effects": list_effect_names(),
-                  "motions": list_motion_names(),
+                        "motions": list_motion_names(),
                         "shapes": list_shape_names(),
                         "colors": list_color_names(),
                     }

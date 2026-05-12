@@ -74,6 +74,46 @@ def create_gradient_outline_surface(
     return surface
 
 
+def create_gradient_outline_viewport_surface(
+    points,
+    size,
+    line_width=6,
+    segments_per_edge=100,
+    closed=True,
+    color_fn=rainbow,
+):
+    if len(points) < 2:
+        raise ValueError("At least two points are required to render an outline")
+
+    width, height = size
+    width = max(1, int(width))
+    height = max(1, int(height))
+    line_width = max(1, int(line_width))
+    segments_per_edge = max(1, int(segments_per_edge))
+
+    n = len(points)
+    cx = sum(p.x for p in points) / n
+    cy = sum(p.y for p in points) / n
+    center_shift = pygame.Vector2(width / 2.0, height / 2.0)
+    offset_points = [pygame.Vector2(p.x - cx, p.y - cy) + center_shift for p in points]
+
+    surface = pygame.Surface((width, height), pygame.SRCALPHA)
+    edge_count = len(offset_points)
+    max_edges = edge_count if closed else edge_count - 1
+
+    for edge in range(max_edges):
+        start = offset_points[edge]
+        end = offset_points[(edge + 1) % edge_count]
+
+        for i in range(segments_per_edge):
+            t1 = i / segments_per_edge
+            t2 = (i + 1) / segments_per_edge
+            color = color_fn((edge + t1) / edge_count)
+            pygame.draw.line(surface, color, start.lerp(end, t1), start.lerp(end, t2), line_width)
+
+    return surface
+
+
 def create_parallel_lines_surface(
     size,
     line_count,
@@ -108,9 +148,10 @@ def create_parallel_lines_surface(
     center_y = height / 2.0
 
     offset = (float(offset) % 1.0) * spacing
-    half_range = int(math.ceil(perpendicular_extent / spacing)) + line_count + 4
+    half_range = int(math.ceil((perpendicular_extent + line_width * 2.0) / spacing)) + 3
     segment = line_extent * 2.0 + line_width * 4.0
     sample_segments = max(segments_per_line, int(math.ceil(segments_per_line / gradient_zoom)))
+    colors = [color_fn(((s / sample_segments) / gradient_zoom) % 1.0) for s in range(sample_segments)]
 
     for i in range(-half_range, half_range + 1):
         distance = i * spacing + offset
@@ -131,10 +172,38 @@ def create_parallel_lines_surface(
             x2 = start_x + (end_x - start_x) * t2
             y2 = start_y + (end_y - start_y) * t2
 
-            color = color_fn((t1 / gradient_zoom) % 1.0)
+            color = colors[s]
             pygame.draw.line(surface, color, (x1, y1), (x2, y2), line_width)
 
     return surface
+
+
+def create_wrapped_shifted_surface(source_surface, offset_x=0, offset_y=0):
+    width, height = source_surface.get_size()
+    shift_x = int(round(offset_x)) % width if width else 0
+    shift_y = int(round(offset_y)) % height if height else 0
+
+    if not shift_x and not shift_y:
+        return source_surface
+
+    shifted_surface = pygame.Surface((width, height), pygame.SRCALPHA)
+
+    if shift_x and shift_y:
+        positions = (
+            (shift_x - width, shift_y - height),
+            (shift_x - width, shift_y),
+            (shift_x, shift_y - height),
+            (shift_x, shift_y),
+        )
+    elif shift_x:
+        positions = ((shift_x - width, 0), (shift_x, 0))
+    else:
+        positions = ((0, shift_y - height), (0, shift_y))
+
+    for x, y in positions:
+        shifted_surface.blit(source_surface, (x, y))
+
+    return shifted_surface
 
 
 def create_dots_surface(
