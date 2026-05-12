@@ -6,6 +6,7 @@ from collections import OrderedDict
 from colors import get_color_function
 from effects import apply_effect_chain
 from renderer import (
+    create_circle_outline_viewport_surface,
     create_gradient_outline_surface,
     create_gradient_outline_viewport_surface,
     create_parallel_lines_surface,
@@ -58,6 +59,7 @@ except Exception as exc:
 surface_cache = OrderedDict()
 CACHE_LIMIT = 16
 BASIC_OUTLINE_SHAPES = {"circle", "line", "square", "triangle"}
+CIRCLE_BASE_RADIUS = 200.0
 
 
 def blit_motion_wrapped(target_surface, source_surface, motion_name, offset_fraction):
@@ -121,18 +123,15 @@ def get_cached_surface(cache_key, build_fn):
 
 
 def get_multiline_motion_offset(snapshot, angle_deg):
-    width, height = WIDTH, HEIGHT
     angle_rad = math.radians(float(angle_deg) % 360.0)
     px = -math.sin(angle_rad)
     py = math.cos(angle_rad)
-    perpendicular_extent = (abs(px) * width + abs(py) * height) / 2.0
-    spacing = max(1.0, (perpendicular_extent * 2.0) / max(1, int(snapshot.lines_count)))
-    offset_fraction = float(snapshot.lines_offset) % 1.0
+    motion_phase = float(snapshot.lines_offset)
 
     if snapshot.motion_name in ("left-to-right", "right-to-left"):
-        return (px * offset_fraction * WIDTH) / spacing
+        return px * motion_phase
     if snapshot.motion_name in ("top-to-bottom", "bottom-to-top"):
-        return (py * offset_fraction * HEIGHT) / spacing
+        return py * motion_phase
 
     return 0.0
 
@@ -222,6 +221,27 @@ def build_shape_surface(snapshot, effect_names=(), viewport=False, multiline_ang
             dot_count=snapshot.dot_count,
             line_width=snapshot.line_width,
             color_fn=color_fn,
+        )
+
+    if snapshot.shape_name == "circle" and viewport:
+        shape_size = max(0.1, float(getattr(snapshot, "shape_size", 1.0)))
+        radius = CIRCLE_BASE_RADIUS * shape_size
+        angle_offset = 0.0
+
+        if "grow" in effect_names:
+            _, base_points = build_outline_points(snapshot, ())
+            radius *= get_grow_scale(snapshot, base_points) / shape_size
+        if "rotate" in effect_names:
+            angle_offset -= float(snapshot.angle) % 360.0
+
+        segment_count = max(96, min(512, int(snapshot.segments_per_edge) * 4))
+        return create_circle_outline_viewport_surface(
+            (WIDTH, HEIGHT),
+            radius=radius,
+            line_width=snapshot.line_width,
+            segments=segment_count,
+            color_fn=color_fn,
+            angle_offset_deg=angle_offset,
         )
 
     preset, shape_points = build_outline_points(snapshot, effect_names)

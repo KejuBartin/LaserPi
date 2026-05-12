@@ -114,6 +114,41 @@ def create_gradient_outline_viewport_surface(
     return surface
 
 
+def create_circle_outline_viewport_surface(
+    size,
+    radius,
+    line_width=6,
+    segments=384,
+    color_fn=rainbow,
+    angle_offset_deg=0.0,
+):
+    width, height = size
+    width = max(1, int(width))
+    height = max(1, int(height))
+    radius = max(1.0, float(radius))
+    line_width = max(1, int(line_width))
+    segments = max(24, int(segments))
+
+    surface = pygame.Surface((width, height), pygame.SRCALPHA)
+    center_x = width / 2.0
+    center_y = height / 2.0
+    angle_offset = math.radians(float(angle_offset_deg) % 360.0)
+
+    previous_x = center_x + math.cos(angle_offset) * radius
+    previous_y = center_y + math.sin(angle_offset) * radius
+
+    for i in range(1, segments + 1):
+        t = i / segments
+        angle = angle_offset + t * math.tau
+        x = center_x + math.cos(angle) * radius
+        y = center_y + math.sin(angle) * radius
+        pygame.draw.line(surface, color_fn((i - 1) / segments), (previous_x, previous_y), (x, y), line_width)
+        previous_x = x
+        previous_y = y
+
+    return surface
+
+
 def create_parallel_lines_surface(
     size,
     line_count,

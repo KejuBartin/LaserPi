@@ -126,7 +126,7 @@ class SharedLaserState:
                 step = speed * dt
                 if motion_name in ("right-to-left", "bottom-to-top"):
                     step = -step
-                self._state.lines_offset = (self._state.lines_offset + step) % 1.0
+                self._state.lines_offset += step
 
             # Bounce physics: maintain a normalized position and velocity in the
             # shared state and reflect on the 0..1 bounds so that the movement
