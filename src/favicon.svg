@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: url(#Unbenannter_Verlauf_7);
+      }
+
+      .cls-2 {
+        fill: #00fa9e;
+      }
+    </style>
+    <radialGradient id="Unbenannter_Verlauf_7" data-name="Unbenannter Verlauf 7" cx="256" cy="256" fx="256" fy="256" r="256" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#000"/>
+      <stop offset="1" stop-color="#003219"/>
+    </radialGradient>
+  </defs>
+  <g id="Hintergrund">
+    <rect class="cls-1" y="0" width="512" height="512" rx="100" ry="100"/>
+  </g>
+  <g id="Laser">
+    <g>
+      <g id="g2942">
+        <rect id="rect2934" class="cls-2" x="247.02" y="28.96" width="17.96" height="454.09"/>
+        <rect id="rect2940" class="cls-2" x="247.02" y="107.31" width="17.96" height="297.38" transform="translate(-57.53 74.98) rotate(-15)"/>
+      </g>
+      <g id="g2946">
+        <rect id="rect2948" class="cls-2" x="247.02" y="28.95" width="17.96" height="454.09" transform="translate(-93.7 162.3) rotate(-30)"/>
+        <rect id="rect2950" class="cls-2" x="247.02" y="107.31" width="17.96" height="297.38" transform="translate(-106.04 256) rotate(-45)"/>
+      </g>
+      <g id="g2952">
+        <rect id="rect2954" class="cls-2" x="247.02" y="28.96" width="17.96" height="454.09" transform="translate(-93.7 349.7) rotate(-60)"/>
+        <rect id="rect2956" class="cls-2" x="247.02" y="107.31" width="17.96" height="297.38" transform="translate(-57.53 437.02) rotate(-75)"/>
+      </g>
+      <rect id="rect2962" class="cls-2" x="107.31" y="247.02" width="297.38" height="17.96" transform="translate(-57.53 74.98) rotate(-15)"/>
+      <g id="g2964">
+        <rect id="rect2966" class="cls-2" x="28.96" y="247.02" width="454.09" height="17.96" transform="translate(-93.7 162.3) rotate(-30)"/>
+        <rect id="rect2968" class="cls-2" x="107.31" y="247.02" width="297.38" height="17.96" transform="translate(-106.04 256) rotate(-45)"/>
+      </g>
+      <g id="g2970">
+        <rect id="rect2972" class="cls-2" x="28.96" y="247.02" width="454.09" height="17.96" transform="translate(-93.7 349.71) rotate(-60)"/>
+        <rect id="rect2974" class="cls-2" x="107.31" y="247.02" width="297.38" height="17.96" transform="translate(-57.53 437.02) rotate(-75)"/>
+      </g>
+      <rect id="rect2966-2" data-name="rect2966" class="cls-2" x="28.96" y="247.02" width="454.09" height="17.96"/>
+    </g>
+  </g>
+</svg>

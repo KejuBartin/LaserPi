@@ -1,4 +1,6 @@
 import json
+import mimetypes
+import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -13,6 +15,9 @@ HTML = """<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LaserPi Control</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <style>
     :root {
       color-scheme: dark;
@@ -536,6 +541,7 @@ MAX_LINE_WIDTH = 40
 MAX_SEGMENTS_PER_EDGE = 200
 MAX_LINES_COUNT = 64
 MAX_DOT_COUNT = 50
+ASSET_DIR = os.path.dirname(__file__)
 
 
 def _parse_bool(value):
@@ -552,6 +558,23 @@ def _parse_bool(value):
 
 def _build_handler(control_state):
     class LaserControlHandler(BaseHTTPRequestHandler):
+        def _send_file(self, path, content_type=None):
+            if not os.path.isfile(path):
+                self.send_error(404, "Not found")
+                return
+
+            with open(path, "rb") as file_handle:
+                body = file_handle.read()
+
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header(
+                "Content-Type",
+                content_type or mimetypes.guess_type(path)[0] or "application/octet-stream",
+            )
+            self.end_headers()
+            self.wfile.write(body)
+
         def _send_json(self, payload, status=200):
             body = json.dumps(payload).encode("utf-8")
             self.send_response(status)
@@ -682,6 +705,15 @@ def _build_handler(control_state):
         def do_GET(self):
             if self.path == "/":
                 return self._send_html(HTML)
+
+            if self.path == "/favicon.svg":
+                return self._send_file(os.path.join(ASSET_DIR, "favicon.svg"), "image/svg+xml")
+
+            if self.path == "/favicon.ico":
+                return self._send_file(os.path.join(ASSET_DIR, "favicon.ico"), "image/x-icon")
+
+            if self.path == "/apple-touch-icon.png":
+                return self._send_file(os.path.join(ASSET_DIR, "apple-touch-icon.png"), "image/png")
 
             if self.path == "/api/meta":
                 return self._send_json(
